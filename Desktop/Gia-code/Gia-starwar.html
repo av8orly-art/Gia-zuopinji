@@ -214,6 +214,19 @@ document.addEventListener('keyup',e=>{ keys[e.code]=false; });
 
 let joystickActive=false, joystickOrigin={x:0,y:0}, joystickDelta={x:0,y:0};
 let touchFiring=false;
+let mousePosCanvas={x:CW/2,y:CH-80}, mouseControl=false, mouseFiring=false;
+canvas.addEventListener('mousemove',e=>{
+  if(state!=='playing') return;
+  const rect=canvas.getBoundingClientRect();
+  const scaleX=CW/rect.width, scaleY=CH/rect.height;
+  mousePosCanvas.x=(e.clientX-rect.left)*scaleX;
+  mousePosCanvas.y=(e.clientY-rect.top)*scaleY;
+  mouseControl=true;
+});
+canvas.addEventListener('mousedown',e=>{ if(state==='playing'){ mouseFiring=true; e.preventDefault(); } });
+canvas.addEventListener('mouseup',e=>{ mouseFiring=false; });
+canvas.addEventListener('mouseleave',e=>{ mouseControl=false; mouseFiring=false; });
+canvas.style.cursor='crosshair';
 function setupTouch(){
   const ja=document.getElementById('joystickArea');
   const jk=document.getElementById('joystickKnob');
@@ -521,16 +534,22 @@ function update(dt){
   frame++;
   // player movement
   const spd=player.speed;
-  if((keys['ArrowLeft']||keys['KeyA'])||joystickDelta.x<-0.2) player.x-=spd+(joystickDelta.x<-0.2?(Math.abs(joystickDelta.x)-0.2)*spd*1.5:0);
-  if((keys['ArrowRight']||keys['KeyD'])||joystickDelta.x>0.2) player.x+=spd+(joystickDelta.x>0.2?(joystickDelta.x-0.2)*spd*1.5:0);
-  if((keys['ArrowUp']||keys['KeyW'])||joystickDelta.y<-0.2) player.y-=spd;
-  if((keys['ArrowDown']||keys['KeyS'])||joystickDelta.y>0.2) player.y+=spd;
+  if(mouseControl){
+    const dx=mousePosCanvas.x-player.x, dy=mousePosCanvas.y-player.y;
+    const dist=Math.sqrt(dx*dx+dy*dy);
+    if(dist>2){ const mv=Math.min(spd*2,dist); player.x+=dx/dist*mv; player.y+=dy/dist*mv; }
+  } else {
+    if((keys['ArrowLeft']||keys['KeyA'])||joystickDelta.x<-0.2) player.x-=spd+(joystickDelta.x<-0.2?(Math.abs(joystickDelta.x)-0.2)*spd*1.5:0);
+    if((keys['ArrowRight']||keys['KeyD'])||joystickDelta.x>0.2) player.x+=spd+(joystickDelta.x>0.2?(joystickDelta.x-0.2)*spd*1.5:0);
+    if((keys['ArrowUp']||keys['KeyW'])||joystickDelta.y<-0.2) player.y-=spd;
+    if((keys['ArrowDown']||keys['KeyS'])||joystickDelta.y>0.2) player.y+=spd;
+  }
   player.x=Math.max(player.w/2,Math.min(CW-player.w/2,player.x));
   player.y=Math.max(player.h/2,Math.min(CH-player.h/2,player.y));
   // shooting
   player.shootCooldown--;
   const fireRate=player.rapidFire>0?8:player.shootRate;
-  if((keys['Space']||touchFiring)&&player.shootCooldown<=0){
+  if((keys['Space']||touchFiring||mouseFiring)&&player.shootCooldown<=0){
     spawnBullet(); player.shootCooldown=fireRate;
   }
   // powerup timers
